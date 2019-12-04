@@ -1,4 +1,5 @@
 // SECTION create (:Auviktenant) nodes and relationships to parent and (:Company)
+
 WITH "base-auvik-api-url/tenants/detail?tenantDomainPrefix=bluenetinc" as url,"auvik-restapi-token" as token
 CALL apoc.load.jsonParams(url,{Authorization:"Basic "+token,Accept:"application/json"},null) yield value
 unwind value.data as tenant
@@ -19,7 +20,6 @@ SET at.lastupdate=latestmod;
 // SECTION SET URL property for each :Auviktenant to query networks
 WITH "2019-01-01T00:00:00.000Z" as thismorning
 MATCH (at:Auviktenant) where not at.type='multiClient'
-OPTIONAL MATCH (at)--(an:Auviknetwork)
 MERGE (import:Auvikimport {id: 0}) SET import.urllist=[] REMOVE import.url,import.urllist
 WITH *,"base-auvik-api-url/inventory/network/info?filter[modifiedAfter]="+coalesce(at.lastupdate,thismorning)+"&tenants="+at.id as url
 FOREACH (ignoreMe in CASE WHEN not url in coalesce(import.urllist,[]) then [1] ELSE [] END | SET import.urllist=coalesce(import.urllist,[]) + url)
