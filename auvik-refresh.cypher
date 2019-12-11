@@ -96,7 +96,7 @@ UNWIND value.data as device
 WITH import,value,device,split(apoc.text.base64Decode(device.id),',')[0] as tenantid,split(apoc.text.base64Decode(device.id),',')[1] as deviceid
 MATCH (at:Auviktenant {id:tenantid})
 MERGE (adt:Auvikdevicetype {name:coalesce(device.attributes.deviceType,'None Provided')})
-MERGE (ad:Auvikdevice {id:deviceid,tenant:tenantid}) SET ad.type=device.attributes.deviceType,ad.model=device.attributes.makeModel,ad.serialnumber=device.attributes.serialNumber,ad.vendor=device.attributes.vendorName,ad.description=device.attributes.description,ad.modified=device.attributes.lastModified,ad.devicename=device.attributes.deviceName,ad.swversion=device.attributes.softwareVersion,ad.fwversion=device.attributes.firmwareVersion,ad.lastseen=datetime(device.attributes.lastSeenTime).epochmillis,ad.managestatus=device.attributes.manageStatus
+MERGE (ad:Auvikdevice {id:deviceid,tenant:tenantid}) SET ad.type=device.attributes.deviceType,ad.model=device.attributes.makeModel,ad.serialnumber=toLower(apoc.text.replace(apoc.text.replace(device.attributes.serialNumber, "[^a-zA-Z\\d]",""),"VMware","")),ad.vendor=device.attributes.vendorName,ad.description=device.attributes.description,ad.modified=device.attributes.lastModified,ad.devicename=device.attributes.deviceName,ad.swversion=device.attributes.softwareVersion,ad.fwversion=device.attributes.firmwareVersion,ad.lastseen=datetime(device.attributes.lastSeenTime).epochmillis,ad.managestatus=device.attributes.manageStatus
 MERGE (ad)-[:DEVICE_IS_TYPE]->(adt)
 MERGE (ad)-[:WITHIN_TENANT]->(at)
 WITH import,value,device,ad
@@ -159,7 +159,7 @@ WITH import,value,interface,split(apoc.text.base64Decode(interface.id),',')[0] a
 OPTIONAL MATCH (at:Auviktenant {id:interface.relationships.tenant.data.id})
 MERGE (ai:Auvikinterface {id:interfaceid,tenant:tenantid})
 SET ai.speed=interface.attributes.negotiatedSpeed,ai.modified=interface.attributes.lastModified,ai.duplex=interface.attributes.duplex,ai.interfacename=interface.attributes.interfaceName,
-ai.operstatus=interface.attributes.operationalStatus,ai.adminstatus=interface.attributes.adminStatus,ai.parents='none',ai.macaddress=interface.attributes.macAddress
+ai.operstatus=interface.attributes.operationalStatus,ai.adminstatus=interface.attributes.adminStatus,ai.parents='none',ai.macaddress=toLower(apoc.text.replace(interface.attributes.macAddress,"[^a-zA-Z\\d]",""))
 SET import.ifcount=import.ifcount+1
 MERGE (ait:Auvikinterfacetype {name:coalesce(interface.attributes.interfaceType,'None Provided')})
 MERGE (ai)-[:INTERFACE_IS_TYPE]->(ait)
