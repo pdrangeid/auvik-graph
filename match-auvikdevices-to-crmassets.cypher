@@ -4,28 +4,33 @@
 // multiple approaches.  serial number, mac address, and variants of the devicename
 
 // MATCH Crmassets (serial of auvik device)
-MATCH (ad:Auvikdevice)--(at:Auviktenant)--(:Auviktenant)--(a:Company) where not (ad)--(:Crmasset)
-MATCH (a)--(:Auviktenant)--(at)--(ad) where not (ad)--(:Crmasset) and exists(ad.serialnumber)
-MATCH (ad)--(at)--(:Auviktenant)--(a)--(ca:Crmasset) where exists(ca.serial)
-WITH at,a,collect(distinct ad) as auvikdevices,collect(distinct ca) as crmassets
-UNWIND auvikdevices as ad
-UNWIND crmassets as ca
-WITH ad,ca,"[^a-zA-Z\\d]" as regex
-WITH ad,ca,toLower(apoc.text.replace(ca.serial, regex,"")) as caserial,toLower(apoc.text.replace(ad.serialnumber, regex,"")) as adserial
-WITH ad,ca,caserial,adserial where caserial=adserial
+MATCH (at:Auviktenant)--(:Auviktenant)--(a:Company) where at.adcount >0
+WITH collect(distinct a) as companies
+UNWIND companies as a
+MATCH (a)--(ca:Crmasset) where exists(ca.serial)
+WITH a,collect(distinct ca) as assets
+MATCH (at:Auviktenant)--()--(a) where at.adcount >0
+WITH assets,a,collect(distinct at) as tenants
+UNWIND tenants as at
+MATCH (ad:Auvikdevice)--(at)--(:Auviktenant)--(a) where not (ad)--(:Crmasset) and exists(ad.serialnumber)
+UNWIND assets as ca
+WITH ca,ad where ca.serial=ad.serialnumber
 MERGE (ad)<-[:IS_AUVIK_MONITORED]-(ca)
 RETURN ad.id,ca.name order by ad.name;
 
+
 // MATCH Crmassets (mac of auvik device)
-MATCH (ad:Auvikdevice)--(at:Auviktenant)--(:Auviktenant)--(a:Company) where not (ad)--(:Crmasset)
-MATCH (a)--(:Auviktenant)--(at)--(ad) where not (ad)--(:Crmasset) and exists(ad.macaddress)
-MATCH (ad)--(at)--(:Auviktenant)--(a)--(ca:Crmasset) where exists(ca.mac)
-WITH at,a,collect(distinct ad) as auvikdevices,collect(distinct ca) as crmassets
-UNWIND auvikdevices as ad
-UNWIND crmassets as ca
-WITH ad,ca,"[^a-zA-Z\\d]" as regex
-WITH ad,ca,toLower(apoc.text.replace(ca.mac, regex,"")) as camac,toLower(apoc.text.replace(ad.macaddress, regex,"")) as admac
-WITH ad,ca,camac,admac where camac=admac
+MATCH (at:Auviktenant)--(:Auviktenant)--(a:Company) where at.adcount >0
+WITH collect(distinct a) as companies
+UNWIND companies as a
+MATCH (a)--(ca:Crmasset) where exists(ca.mac)
+WITH a,collect(distinct ca) as assets
+MATCH (at:Auviktenant)--()--(a) where at.adcount >0
+WITH assets,a,collect(distinct at) as tenants
+UNWIND tenants as at
+MATCH (ad:Auvikdevice)--(at)--(:Auviktenant)--(a) where not (ad)--(:Crmasset) and exists(ad.macaddress)
+UNWIND assets as ca
+WITH ca,ad where ca.mac=ad.macaddress
 MERGE (ad)<-[:IS_AUVIK_MONITORED]-(ca)
 RETURN ad.id,ca.name order by ad.name;
 
@@ -43,12 +48,16 @@ MERGE (ad)<-[:IS_AUVIK_MONITORED]-(ca)
 RETURN distinct ad.id,ad.devicename,ca.name order by ad.devicename;
 
 // MATCH Crmassets (name of auvik device)
-MATCH (ad:Auvikdevice)--(at:Auviktenant)--(:Auviktenant)--(a:Company) where not (ad)--(:Crmasset)
-MATCH (a)--(:Auviktenant)--(at)--(ad) where not (ad)--(:Crmasset) and exists(ad.devicename) and not(ad.devicename contains 'Device@' or ad.devicename='Unknown')
-MATCH (ad)--(at)--(:Auviktenant)--(a)--(ca:Crmasset) where exists(ca.name) and not(ca.name contains 'Device@' or ca.name contains 'Unknown')
-WITH at,a,collect(distinct ad) as auvikdevices,collect(distinct ca) as crmassets
-UNWIND auvikdevices as ad
-UNWIND crmassets as ca
+MATCH (at:Auviktenant)--(:Auviktenant)--(a:Company) where at.adcount >0
+WITH collect(distinct a) as companies
+UNWIND companies as a
+MATCH (a)--(ca:Crmasset) where exists(ca.name) and not(ca.name contains 'Device@' or ca.name contains 'Unknown')
+WITH a,collect(distinct ca) as assets
+MATCH (at:Auviktenant)--()--(a) where at.adcount >0
+WITH assets,a,collect(distinct at) as tenants
+UNWIND tenants as at
+MATCH (ad:Auvikdevice)--(at)--(:Auviktenant)--(a) where not (ad)--(:Crmasset) and exists(ad.devicename) and not(ad.devicename contains 'Device@' or ad.devicename='Unknown')
+UNWIND assets as ca
 WITH ad,ca,"[^a-zA-Z\\d]" as regex
 WITH ad,ca,toLower(apoc.text.replace(ca.name, regex,"")) as caname,toLower(apoc.text.replace(ad.devicename, regex,"")) as adname
 WITH ad,ca,caname,adname where caname=adname
@@ -56,12 +65,16 @@ MERGE (ad)<-[:IS_AUVIK_MONITORED]-(ca)
 RETURN distinct ad.id,ad.devicename,ca.name order by ad.devicename;
 
 // MATCH Crmassets (fq to nonfqname of auvik device)
-MATCH (ad:Auvikdevice)--(at:Auviktenant)--(:Auviktenant)--(a:Company) where not (ad)--(:Crmasset)
-MATCH (a)--(:Auviktenant)--(at)--(ad) where not (ad)--(:Crmasset) and exists(ad.devicename) and not(ad.devicename contains 'Device@' or ad.devicename='Unknown')
-MATCH (ad)--(at)--(:Auviktenant)--(a)--(ca:Crmasset) where exists(ca.name) and not(ca.name contains 'Device@' or ca.name contains 'Unknown')
-WITH at,a,collect(distinct ad) as auvikdevices,collect(distinct ca) as crmassets
-UNWIND auvikdevices as ad
-UNWIND crmassets as ca
+MATCH (at:Auviktenant)--(:Auviktenant)--(a:Company) where at.adcount >0
+WITH collect(distinct a) as companies
+UNWIND companies as a
+MATCH (a)--(ca:Crmasset) where exists(ca.name) and not(ca.name contains 'Device@' or ca.name contains 'Unknown')
+WITH a,collect(distinct ca) as assets
+MATCH (at:Auviktenant)--()--(a) where at.adcount >0
+WITH assets,a,collect(distinct at) as tenants
+UNWIND tenants as at
+MATCH (ad:Auvikdevice)--(at)--(:Auviktenant)--(a) where not (ad)--(:Crmasset) and exists(ad.devicename) and not(ad.devicename contains 'Device@' or ad.devicename='Unknown')
+UNWIND assets as ca
 WITH ad,ca,"[^a-zA-Z\\d]" as regex
 WITH ad,ca,toLower(apoc.text.replace(ca.name, regex,"")) as caname,toLower(apoc.text.replace(ad.devicename, regex,"")) as adname
 WITH ad,ca,caname,adname where toLower(trim(split(ad.devicename,'.')[0]))=toLower(trim(split(ca.name,'.')[0]))
@@ -69,12 +82,16 @@ MERGE (ad)<-[:IS_AUVIK_MONITORED]-(ca)
 RETURN distinct ad.id,ad.devicename,ca.name order by ad.devicename;
 
 // MATCH Crmassets (name of auvik device including Device@)
-MATCH (ad:Auvikdevice)--(at:Auviktenant)--(:Auviktenant)--(a:Company) where not (ad)--(:Crmasset)
-MATCH (a)--(:Auviktenant)--(at)--(ad) where not (ad)--(:Crmasset) and exists(ad.devicename) and not(ad.devicename='Unknown')
-MATCH (ad)--(at)--(:Auviktenant)--(a)--(ca:Crmasset) where exists(ca.name) and not(ca.name contains 'Unknown')
-WITH at,a,collect(distinct ad) as auvikdevices,collect(distinct ca) as crmassets
-UNWIND auvikdevices as ad
-UNWIND crmassets as ca
+MATCH (at:Auviktenant)--(:Auviktenant)--(a:Company) where at.adcount >0
+WITH collect(distinct a) as companies
+UNWIND companies as a
+MATCH (a)--(ca:Crmasset) where exists(ca.name) and not(ca.name contains 'Unknown')
+WITH a,collect(distinct ca) as assets
+MATCH (at:Auviktenant)--()--(a) where at.adcount >0
+WITH assets,a,collect(distinct at) as tenants
+UNWIND tenants as at
+MATCH (ad:Auvikdevice)--(at)--(:Auviktenant)--(a) where not (ad)--(:Crmasset) and exists(ad.devicename) and not(ad.devicename='Unknown')
+UNWIND assets as ca
 WITH ad,ca,"[^a-zA-Z\\d]" as regex
 WITH ad,ca,toLower(apoc.text.replace(ca.name, regex,"")) as caname,toLower(apoc.text.replace(ad.devicename, regex,"")) as adname
 WITH ad,ca,caname,adname where caname=adname

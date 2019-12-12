@@ -99,7 +99,7 @@ MERGE (adt:Auvikdevicetype {name:coalesce(device.attributes.deviceType,'None Pro
 MERGE (ad:Auvikdevice {id:deviceid,tenant:tenantid})
 SET ad.type=device.attributes.deviceType,ad.model=device.attributes.makeModel,ad.vendor=device.attributes.vendorName,ad.description=device.attributes.description
 SET ad.devicename=device.attributes.deviceName,ad.swversion=device.attributes.softwareVersion,ad.fwversion=device.attributes.firmwareVersion,ad.modified=device.attributes.lastModified
-SET ad.serialnumber=toLower(apoc.text.replace(apoc.text.replace(device.attributes.serialNumber, '[^a-zA-Z\\d]',''),'VMware',''))
+SET ad.serialnumber=toLower(apoc.text.replace(apoc.text.replace(device.attributes.serialNumber, '[^a-zA-Z0-9]',''),'VMware',''))
 SET ad.lastseen=datetime(device.attributes.lastSeenTime).epochmillis,ad.managestatus=device.attributes.manageStatus
 MERGE (ad)-[:DEVICE_IS_TYPE]->(adt)
 MERGE (ad)-[:WITHIN_TENANT]->(at)
@@ -164,7 +164,7 @@ OPTIONAL MATCH (at:Auviktenant {id:interface.relationships.tenant.data.id})
 MERGE (ai:Auvikinterface {id:interfaceid,tenant:tenantid})
 SET ai.speed=interface.attributes.negotiatedSpeed,ai.modified=interface.attributes.lastModified,ai.duplex=interface.attributes.duplex,ai.interfacename=interface.attributes.interfaceName
 SET ai.operstatus=interface.attributes.operationalStatus,ai.adminstatus=interface.attributes.adminStatus,ai.parents='none'
-SET ai.macaddress=toLower(apoc.text.replace(interface.attributes.macAddress,'[^a-zA-Z\\d]',''))
+SET ai.macaddress=toLower(apoc.text.replace(interface.attributes.macAddress,'[^a-zA-Z0-9]',''))
 SET import.ifcount=import.ifcount+1
 MERGE (ait:Auvikinterfacetype {name:coalesce(interface.attributes.interfaceType,'None Provided')})
 MERGE (ai)-[:INTERFACE_IS_TYPE]->(ait)
@@ -172,7 +172,7 @@ WITH import,value,interface,ai,at
 UNWIND interface.relationships.parentDevice.data as parent
 OPTIONAL MATCH (apd:Auvikdevice {id:split(apoc.text.base64Decode(parent.id),',')[1],tenant:split(apoc.text.base64Decode(parent.id),',')[0]})
 FOREACH (ignoreMe in CASE WHEN exists(apd.id) then [1] ELSE [] END | MERGE (ai)-[:PARENT_DEVICE]->(apd))
-FOREACH (ignoreMe in CASE WHEN exists(apd.id) and not exists(apd.macaddress) then [1] ELSE [] END | SET apd.macaddress=ai.macaddress)
+//FOREACH (ignoreMe in CASE WHEN exists(apd.id) and not exists(apd.macaddress) then [1] ELSE [] END | SET apd.macaddress=ai.macaddress)
 FOREACH (ignoreMe in CASE WHEN not exists(apd.id) and exists(at.id) then [1] ELSE [] END | MERGE (ai)-[pir:PARENTLESS_INTERFACE]->(at) SET pir.id=split(apoc.text.base64Decode(parent.id),',')[1])
 WITH import,value,ai,interface
 UNWIND interface.attributes.ipAddresses as interfaceip
@@ -196,6 +196,109 @@ OPTIONAL MATCH (at)--(:Auvikdevice)--(ai:Auvikinterface) REMOVE at.ifcount
 WITH at,count(ai) as aicount
 SET at.ifcount=aicount
 return at.name,at.owner,at.adcount,at.ifcount;
+
+// Set the DEVICE macaddress to the me0/tn-mgt0 'Ethernet' Interface macaddress (when there are multiple interfaces with a mac address)
+MATCH (ad:Auvikdevice) where not exists(ad.macaddress)
+MATCH (ad)-[r]-(ai:Auvikinterface) where exists(ai.macaddress)
+WITH ad,count(r) as intcount
+WITH ad,intcount where intcount > 1
+MATCH (ad)--(ai)--(ait:Auvikinterfacetype {name:'ethernet'}) where exists(ai.macaddress) and (ai.interfacename ='me0' or ai.interfacename = 'tn-mgt0' or ai.interfacename = 'ManagementEthernet 0/0')
+SET ad.macaddress=ai.macaddress
+RETURN ad,ai,ait;
+//RETURN count(ad);
+//return distinct ad.devicename,intcount order by intcount desc
+
+// Set the DEVICE macaddress to the (IF name contains manage or mgmt) 'Ethernet' Interface macaddress (when there are multiple interfaces with a mac address)
+MATCH (ad:Auvikdevice) where not exists(ad.macaddress)
+MATCH (ad)-[r]-(ai:Auvikinterface) where exists(ai.macaddress)
+WITH ad,count(r) as intcount
+WITH ad,intcount where intcount > 1
+MATCH (ad)--(ai)--(ait:Auvikinterfacetype {name:'ethernet'}) where exists(ai.macaddress) and (toLower(ai.interfacename) contains 'manage' or toLower(ai.interfacename) contains 'mgmt')
+SET ad.macaddress=ai.macaddress
+RETURN count(ad);
+//return distinct ad.devicename,intcount order by intcount desc
+
+// Set the Mitel DEVICE macaddress to theExternal LAN 'Ethernet' Interface macaddress (when there are multiple interfaces with a mac address)
+MATCH (ad:Auvikdevice) where not exists(ad.macaddress)
+MATCH (ad )-[r]-(ai:Auvikinterface) where exists(ai.macaddress)
+WITH ad,count(r) as intcount
+WITH ad,intcount where intcount > 1
+MATCH (ad {vendor:'Mitel'})--(ai {interfacename:'External 10/100 LAN Port'})--(ait:Auvikinterfacetype {name:'ethernet'}) where exists(ai.macaddress)
+SET ad.macaddress=ai.macaddress
+RETURN count(ad);
+//return distinct ad.devicename,intcount order by intcount desc
+
+// Set the HP JetDirect DEVICE macaddress to the Ethernet Interface macaddress (when there are multiple interfaces with a mac address)
+MATCH (ad:Auvikdevice) where not exists(ad.macaddress)
+MATCH (ad )-[r]-(ai:Auvikinterface) where exists(ai.macaddress)
+WITH ad,count(r) as intcount
+WITH ad,intcount where intcount > 1
+MATCH (ad {model:'JetDirect'})--(ai {interfacename:'Ethernet'})--(ait:Auvikinterfacetype {name:'ethernet'}) where exists(ai.macaddress)
+SET ad.macaddress=ai.macaddress
+RETURN count(ad);
+//return distinct ad.devicename,intcount order by intcount desc
+
+// Set the Zebra DEVICE macaddress to the SMC Ethernet Interface macaddress (when there are multiple interfaces with a mac address)
+MATCH (ad:Auvikdevice) where not exists(ad.macaddress)
+MATCH (ad )-[r]-(ai:Auvikinterface) where exists(ai.macaddress)
+WITH ad,count(r) as intcount
+WITH ad,intcount where intcount > 1
+MATCH (ad {vendor:'Zebra'})--(ai)--(ait:Auvikinterfacetype {name:'ethernet'}) where exists(ai.macaddress) and toLower(ad.model) ends with 'printserver' and ai.interfacename starts with 'SMC'
+SET ad.macaddress=ai.macaddress
+RETURN count(ad);
+//return distinct ad.devicename,intcount order by intcount desc
+
+// Set the VMWARE ESX DEVICE macaddress to vmnic0 'Ethernet' Interface macaddress (when there are multiple interfaces with a mac address)
+MATCH (ad:Auvikdevice) where not exists(ad.macaddress)
+MATCH (ad )-[r]-(ai:Auvikinterface) where exists(ai.macaddress)
+WITH ad,count(r) as intcount
+WITH ad,intcount where intcount > 1
+MATCH (ad {model:'ESX'})--(ai)--(ait:Auvikinterfacetype {name:'ethernet'}) where exists(ai.macaddress) and toLower(ai.interfacename) contains 'vmnic0'
+SET ad.macaddress=ai.macaddress
+RETURN count(ad);
+//return distinct ad.devicename,intcount order by intcount desc
+
+// Set the DEVICE macaddress to management 'virtualNic' Interface macaddress (when there are multiple interfaces with a mac address)
+MATCH (ad:Auvikdevice) where not exists(ad.macaddress)
+MATCH (ad )-[r]-(ai:Auvikinterface) where exists(ai.macaddress)
+WITH ad,count(r) as intcount
+WITH ad,intcount where intcount > 1
+MATCH (ad)--(ai)--(ait:Auvikinterfacetype {name:'virtualNic'}) where exists(ai.macaddress) and toLower(ai.interfacename) contains 'management'
+SET ad.macaddress=ai.macaddress
+RETURN count(ad);
+//return distinct ad.devicename,intcount order by intcount desc
+
+
+// Set the DEVICE macaddress to the eth0 'Ethernet' Interface macaddress (when there are multiple interfaces with a mac address)
+MATCH (ad:Auvikdevice) where not exists(ad.macaddress)
+MATCH (ad)-[r]-(ai:Auvikinterface) where exists(ai.macaddress)
+WITH ad,count(r) as intcount
+WITH ad,intcount where intcount > 1
+MATCH (ad)--(ai {interfacename:'eth0'})--(ait:Auvikinterfacetype {name:'ethernet'}) where exists(ai.macaddress)
+SET ad.macaddress=ai.macaddress
+RETURN count(ad);
+//return distinct ad.devicename,intcount order by intcount desc
+
+// Set the DEVICE macaddress to the eth0 'Ethernet' Interface macaddress (when there are multiple interfaces with a mac address)
+MATCH (ad:Auvikdevice) where not exists(ad.macaddress)
+MATCH (ad)-[r]-(ai:Auvikinterface) where exists(ai.macaddress)
+WITH ad,count(r) as intcount
+WITH ad,intcount where intcount > 1
+MATCH (ad)--(ai)--(ait:Auvikinterfacetype {name:'ethernet'}) where exists(ai.macaddress) and (ai.interfacename='ge-0/0/0' or ai.interfacename='GigabitEthernet 0/0')
+SET ad.macaddress=ai.macaddress
+RETURN count(ad);
+//return distinct ad.devicename,intcount order by intcount desc
+
+
+// Set the DEVICE macaddress to the Interface macaddress (when there is ONLY 1 interface with a mac address)
+MATCH (ad:Auvikdevice) where not exists(ad.macaddress)
+MATCH (ad)-[r]-(ai:Auvikinterface) where exists(ai.macaddress)
+WITH ad,ai,count(r) as intcount
+WITH ad,ai,intcount where intcount = 1
+SET ad.macaddress=ai.macaddress
+RETURN count(ad);
+//return distinct ad.devicename,ai.macaddress,intcount order by intcount desc
+
 
 // SECTION remove stale devicetype relationships
 MATCH (ad:Auvikdevice)-[r]-(adt:Auvikdevicetype) where exists(ad.type) and ad.type <> adt.name
