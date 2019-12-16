@@ -98,7 +98,7 @@ MATCH (at:Auviktenant {id:tenantid})
 MERGE (adt:Auvikdevicetype {name:coalesce(device.attributes.deviceType,'None Provided')})
 MERGE (ad:Auvikdevice {id:deviceid,tenant:tenantid})
 SET ad.type=device.attributes.deviceType,ad.model=device.attributes.makeModel,ad.vendor=device.attributes.vendorName,ad.description=device.attributes.description
-SET ad.devicename=lowercase(trim(apoc.text.replace(device.attributes.deviceName,'[^a-zA-Z0-9]',''))),ad.swversion=device.attributes.softwareVersion,ad.fwversion=device.attributes.firmwareVersion,ad.modified=device.attributes.lastModified
+SET ad.devicename=toLower(trim(apoc.text.replace(device.attributes.deviceName,'[^a-zA-Z0-9]',''))),ad.swversion=device.attributes.softwareVersion,ad.fwversion=device.attributes.firmwareVersion,ad.modified=device.attributes.lastModified
 SET ad.serialnumber=toLower(apoc.text.replace(apoc.text.replace(device.attributes.serialNumber, '[^a-zA-Z0-9]',''),'VMware',''))
 SET ad.lastseen=datetime(device.attributes.lastSeenTime).epochmillis,ad.managestatus=device.attributes.manageStatus
 MERGE (ad)-[:DEVICE_IS_TYPE]->(adt)
