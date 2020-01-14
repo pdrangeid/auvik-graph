@@ -58,6 +58,12 @@ RETURN count"
 {limit:10000}) YIELD batches,batchErrors,failedBatches,failedCommits,commitErrors,executions,runtime,wasTerminated
 RETURN *;
 
+// REMOVE (:Auvikdevice) that is over 10 days old
+WITH timestamp()-864000000 as tendaysold
+MATCH (ad:Auvikdevice) where datetime(ad.modified).epochmillis <tendaysold
+WITH ad where ad.lastseen <tendaysold or not exists(ad.lastseen)
+DETACH DELETE ad;
+
 MATCH (at:Auviktenant)
 OPTIONAL MATCH (at)--(an:Auviknetwork) REMOVE at.ancount
 WITH at,count(an) as ancount
@@ -303,3 +309,9 @@ RETURN count(ad);
 // SECTION remove stale devicetype relationships
 MATCH (ad:Auvikdevice)-[r]-(adt:Auvikdevicetype) where exists(ad.type) and ad.type <> adt.name
 DETACH DELETE r;
+
+// REMOVE (:Auvikdevice) that is not tied to an asset, and is over 1 day old
+WITH timestamp()-86400000 as onedayold
+MATCH (ad:Auvikdevice) where not (ad)--(:Crmasset) and datetime(ad.modified).epochmillis <onedayold
+WITH ad where ad.lastseen <onedayold or not exists(ad.lastseen)
+DETACH DELETE ad;
